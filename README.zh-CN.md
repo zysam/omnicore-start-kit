@@ -1,22 +1,22 @@
 # OmniLayer Start kit
 
-[简体中文](./README.zh-CN.md) | English
+简体中文 | [English](./README.md)
 
-A OmniLayer chain start kit.
+一个搭建 `OmniLayer` 私链的工具。
 
-## Prepare docker environment
+## 准备环境
 
-Before building your own `omnicore` image, you can modify `bitcoin.conf` file depend on your requirement.
+在你构建 `omnicore` 镜像之前，可以根据个人需求修改 `bitcoin.conf` 文件。
 
 ```bash
-# 1. build docker image
+# 1. 构建 docker 镜像
 docker build -t omni:3.1 .
 
-# 2. start omnicore image
+# 2. 运行镜像
 docker run -itd -p 8080:8080 --name=omni omni:3.1
 ```
 
-After you start your omnicore container, you need login on your omni container and start omnicore service:
+在你的 omnicore 容器运行起来后，你还需要登录到 docker 容器中，启动 omnicore 服务：
 
 ```bash
 # login on omni image
@@ -26,36 +26,36 @@ docker exec -it omni bash
 omnicored
 ```
 
-## Develop
+## 开发
 
-Now you can do anything you want with the omnicore chain.
+现在你可以再你运行的私链中做任何你想做的事情。
 
-### Issue new coin
+### 发布一个新币
 
 ```bash
-# issue new coin is also a bitcoin transaction, so we need mining.
-omnicore-cli generate 100
+# 构建新币也是一个 bitcoin 交易，所以需要挖矿
+omnicore-cli generate 100 >> /dev/null
 
-# generate owner address
+# 生成新币 owner 地址
 address=`omnicore-cli getnewaddress`
 
-# store owner address
+# 存储新币 owner 地址
 echo $address > /root/owner-address
 
-# and bitcoin to owner address
+# 发送  1个比特币到 owner 地址
 omnicore-cli sendtoaddress $address 1
 
-# set owner address account name, this is for omnicore-cli getbalance command
+# 设置 owner 地址账户名称，为了 omnicore-cli getbalance 来查看余额
 omnicore-cli setaccount $address owner
 
-# check owner bitcoin balance
+# 查看 owner 账户 bitcoin 余额
 omnicore-cli getbalance owner
 
-# blockchain confirm
+# 区块挖矿确认
 omnicore-cli generate 1
 
 ###
-# Create new coin
+# 构建新币
 #omni_sendissuancefixed "fromaddress" ecosystem type previousid "category" "subcategory" "name" "url" "data" "amount"
 #Create new tokens with fixed supply.
 
@@ -76,116 +76,110 @@ omnicore-cli generate 1
 ###
 omnicore-cli omni_sendissuancefixed $address 1 2 0 "yugaCategory" "yugaSubcategory" "yuga" "www.yuga.com" "yuga for test" "100000"
 
-# blockchain confirm
+# 区块挖矿确认
 omnicore-cli generate 1
 ```
 
-> **Notice:** If you don't want to exec the command one by one, you can use `/root/issue-new-coin.sh` directly.
+> **注意：** 如果你不想一行一行的执行命令，你可以直接通过运行 `/root/issue-new-coin.sh`。
 
-### Create transaction
+### 构建交易
 
 ```bash
-######################## Prepare Transaction
+######################## 准备交易数据
 echo "Start Prepare Transaction -------"
-# this command is depend on issue-new-coin.sh, where owner address store, you can also generate a new one.
+# 获取发送地址，依赖上面生成的 owner 地址，你也可以重新生成一个新地址
 sender_address=`cat /root/owner-address`
 
-# new coin property id, it depends.
+# 新币的资产id, 识实际情况而定，一般默认是3
 property_id=3
 
-# dust value it is suggested to be 546, it will be sent to target address
+# dust 值（发送omni交易的最小BTC费用值），官方建议为 546，将发送到接受地址
 dust_value=0.00000546
 
-# unspent bitcoin amount
+# 还未花掉的BTC数量
 bitcoin_amount=0.1
 
-# change bitcoin amount
+# 找零BTC数量
 change_amount=0.099
 
-# prepare tx bitcoin fee for new coin tx
+# 构建未花销 BTC 交易
 pre_transaction=`omnicore-cli sendtoaddress $sender_address $bitcoin_amount`
 echo "Unspent: "$pre_transaction
 
-# blockchain confirm
+# 区块挖矿确认
 omnicore-cli generate 1
 
-# dump sender private key, if you have just write it directly
+# 获取发送方的私钥，如果你有，可以直接填写
 sender_private_key=`omnicore-cli dumpprivkey $sender_address`
 
-# generate receive new coin address
+# 生成接受方的地址
 receiver_address=`omnicore-cli getnewaddress`
 echo "Receiver: "$receiver_address
 
-# will transfer new coin amount, set it by yourself
+# 将要发送的新币数量，可以任意设置，最小金额为 0.00000001
 yuga_amount=10
 
-# generate omni layer payload for new coin tx
+# 生成 OmniLayer 链特有的 payload
 payload=`omnicore-cli omni_createpayload_simplesend $property_id $yuga_amount` 
 echo "Payload: "$payload
 
-######################## Create Transaction
+######################## 创建交易
 echo "Start Create Transaction -------"
 
-# add tx input -> vin
+# 添加 tx input -> vin
 transaction_input=`omnicore-cli omni_createrawtx_input "" $pre_transaction 0`
 
-# add dust tx output for receiver address, this must go before payload tx output
+# 为添加 dust 交易output，此步骤必须在 payload 交易的 output 之前
 transaction_output1=`omnicore-cli omni_createrawtx_reference $transaction_input $receiver_address $dust_value`
 
-# add payload tx output
+# 添加 payload 的output
 transaction_output2=`omnicore-cli omni_createrawtx_opreturn $transaction_output1 $payload`
 
-# add change tx output, this is omnicore_raw_transaction
+# 添加找零交易输出，此处生成的就是 omnicore 原始交易 hash
 transaction_output3=`omnicore-cli omni_createrawtx_reference $transaction_output2 $sender_address $change_amount`
 echo "Omni tx: "$transaction_output3;
 echo "Raw transaction created"
 
-######################## Sign Transaction
+######################## 签名交易
 echo "Start Sign Transaction -------"
 signed_transaction=`omnicore-cli signrawtransaction $transaction_output3 '[]' "[\"$sender_private_key\"]" | grep -e '"hex": "[^"]*"' | awk -F '"' '{print $4}'`
 echo "Signed Result: \n"$signed_transaction
 
-######################## Broadcast Transaction
+######################## 广播交易
 echo "Start Broadcast Transaction -------"
 transaction_hex=`omnicore-cli sendrawtransaction $signed_transaction`
 echo "Transaction hex: "$transaction_hex
 
-# blockchain confirm
+# 区块挖矿确认
 omnicore-cli generate 1
 
-# check receive address new coin balance
+# 检查接受地址资产是否发生改变
 omnicore-cli omni_getbalance $receiver_address 3
 echo "All done."
 ```
 
-> **Notice:** If you don't want to exec the command one by one, you can use `/root/create-tx.sh` directly.
+> **注意：** 如果你不想一行一行执行命令，你可以直接使用 `/root/create-tx.sh` 文件。
 
-
-## OmniLayer Payload Introduction
+## OmniLayer Payload 简介
 
 ``` bash
-# a standard payload format for simple send tx
+# 一个标准的 omni payload 格式
 6f6d6e69000000000000001f000000003b9aca00
 ```
 
-> * Omni prefix: `6f6d6e69` which can not be modified.
-> * Property Id: `000000000000001f` -> `31` is for master chain `Tether(USDT)`, you can modified it depends on your omni coin property id. For example when you create regtest chain, your first omni coin property id will be `3`, so you need change to `0000000000000003`.
-> * Transfer Amount: `000000003b9aca00` -> is `10 * 10000000` omni coin amount in hex.
+> * Omni 前缀: `6f6d6e69` 这里是固定的，不可修改。
+> * 资产ID: `000000000000001f` -> `31` 是主链的 `Tether(USDT)` ID, 你可以根据你实际生成新币来修改。 比如上面你搭建的私链，生成的第一个 omni 币的资产ID是 `3`，因此你需要修改为 `0000000000000003`。
+> * 交易金额: `000000003b9aca00` -> 等于 `10 * 10000000` 新币的数量。
 
-## Transfer Coins (Simple Send)
+## 简单交易规则
 
-> This paragraph is copy from [official specs](https://github.com/OmniLayer/spec#transfer-coins-simple-send)
+> 来自 [官方规范](https://github.com/OmniLayer/spec#transfer-coins-simple-send)
 
-Description: Transaction type 0 transfers coins in the specified currency from the sending address to the reference address, defined in Appendix A. This transaction can not be used to transfer bitcoins.
+新币是一对一交易，由发送地址给接受地址新币。规则如下:
 
-In addition to the validity constraints on the message field datatypes, the transaction is invalid if any of the following conditions is true:
-
-* the sending address has zero coins in its available balance for the specified currency identifier
-* the amount to transfer exceeds the number owned and available by the sending address
-* the specified currency identifier is non-existent
-* the specified currency identifier is 0 (bitcoin)
-
-A Simple Send to a non-existent address will destroy the coins in question, just like it would with bitcoin.
+* 发送地址由 bitcoin 的交易中的index 为 0 的vin唯一确定。
+* 当 bitcoin 的交易中的有效 vout 仅有一个时，接受地址由这个 vout 唯一确定。
+* 当 bitcoin 的交易中的有效 vout 多于一个时，则去掉第一个与发送地址相同的 vout（若果有的话），取最后一个 vout 的地址作为接受地址。
 
 ## License
 
