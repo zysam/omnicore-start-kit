@@ -44,7 +44,8 @@ class App {
         const omniOutput = bitcoin.payments.embed({ data }).output;
         const totalUnspent = 1000000;
         const dustValue = 546;
-        txb.addInput('<txhash>', totalUnspent); // Alice's previous transaction output, has 15000 satoshis
+        // you need unspent txhash and vout
+        txb.addInput('<txhash>', '<vout>'); 
         txb.addOutput('<receiver address>', dustValue);
         txb.addOutput(omniOutput, 0);
         txb.addOutput('<sender address>', totalUnspent - dustValue);
